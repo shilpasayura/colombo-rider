@@ -1,0 +1,1363 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+
+  <title id="title">CMB Rider</title>
+
+ <link rel="stylesheet" href="css/main.css">
+
+  <style type="text/css">
+  html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+		background-color:#e5e3df;
+		
+      }
+      #map,  #page-settings{
+        height: 88%;
+		width:100%;
+		z-index:1;
+      }
+	  
+	 .mapcanvas{
+	  position:absolute;
+	  left:0px;
+	  top:50px;
+	  opacity:.5;
+	  z-index:7;
+	  }
+	  
+    circle {
+      fill: #66CCFF;
+      stroke-width: 2;
+      stroke: #086A87;
+	   cursor:pointer;
+    }
+    circle.current {
+      fill: OrangeRed;
+      stroke: Firebrick;
+    }
+    circle.highlight {
+      fill: GreenYellow;
+      stroke: green;
+	  
+    }
+    line {
+      stroke-width: 2;
+      stroke: #f3f1ee ;
+    }
+    line.highlight {
+      stroke-width: 3;
+      stroke: IndianRed;
+    }
+	
+	
+	text{
+	cursor:pointer;
+	font-family:Roboto,Arial;
+	font-size:.6em;
+	font-weight:normal;
+	font-stretch: condensed !important;
+	}
+	
+	text.current{
+	font-size:.7em;
+	font-weight:bold;
+	fill:#610B0B;
+	}
+	
+	text.highlight {
+    font-size:.8em;
+	font-weight:bold;
+	fill:black;
+	  
+    }
+	
+	text.current{
+	font-size:.7em;
+	font-weight:bold;
+	color:red;
+	}
+
+
+	
+#rmenu{
+float:right;
+font-family:Roboto,Arial;
+font-size:2em;
+margin-right:2em;
+opacity:0.7;
+display:inline;
+}
+
+#userx{
+width:100%;
+z-index:7;
+}
+
+#track, #gmapsvg{
+font-size:.8em;
+border: 2px solid;
+border-radius: 10px;
+opacity:0.5;
+}
+ 
+#floating-panel{
+position:absolute;
+left: 10%;
+top:80px;
+z-index:7;
+background-color: #fff;
+border: 1px solid #999;
+font-family: 'Roboto','sans-serif';
+line-height: 30px;
+padding:5px;
+visibility:hidden;
+opacity:0.8;
+text-align: center;
+padding: 5px;
+}
+
+
+#infobar{
+	display:inline;
+	height:auto;
+	max-width:500px;
+	font-family:Roboto,Arial;
+	font-size:.7em;
+	padding:5px;
+	font-weight:normal;
+	font-stretch: condensed !important;
+	position:absolute;
+	left:0px;
+	top:42px;
+	background-color:#efefef;
+	box-shadow: 2px 2px 2px #ccc;
+	opacity:0.7;
+	}
+	
+#panel-gmap, #panel-settings{
+padding:0.1em;
+line-height: 24px;
+margin-left:0.2em;
+}
+#track{
+visibility:hidden;
+}
+</style>
+  </head>
+<body onload="init()">
+
+<div id="xheader" onclick="home();">
+   Colombo Rider
+</div>
+<div id="userx">
+<div id="infobar"  draggable="true" ondragstart="drag(event)" ondragend="dragend(event)">click on a node</div>
+<div id="rmenu"><input id="track" type="button" onclick="trackme('track')" value="Track"/><input id="gmapsvg" type="button" onclick="switchmap('gmapsvg')" value="gmap"/></div>
+</div>
+
+<div id="map"></div>
+<div id="floating-panel" draggable="true" ondragstart="drag(event)" ondragend="dragend(event)">
+			<input type="button"  onclick="inputclear('start')" value="x"/>
+			<input type="text" placeholder="start" id="start">
+			<input type="button" id="getdir" onClick="displayRoute()" value="OK"/>
+            <input type="text" placeholder="end" id="end" >
+			<input type="button" onclick="inputclear('end')" value="x"/>
+
+</div>
+
+<div id="xfooter" onclick="home();">
+   Shilpa Sayura 2015
+</div>
+
+ <script type="text/javascript" src="js/dijkstra.js"/></script>
+ <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBHu8UJRBm5XCUGPgCCOGvXR63pdKb-fkA&signed_in=true&libraries=places&callback=initMap"
+        async defer></script>
+  <script>
+  
+    var development=0;
+	
+	
+    var map;
+    var maploaded=false;
+	
+	var homelat=6.89456; // readfrom local db
+    var homelng=79.92229;
+	var mylat=homelat;
+	var mylng=homelng;
+
+    var debugdata=[];// for development
+	var NUMBER_NODES;
+    var NUMBER_EDGES;
+	var container='map';
+	//SVG
+    var canvas;
+	var divider;
+    var SVG_NAMESPACE_URI = "http://www.w3.org/2000/svg";
+
+	var graph = {}; // graph specific info
+	var nodes = []; // nodes array
+	var adjacencyMatrix = []; //will be made 2D array
+	var graphwidth, graphheight,graphR;
+	var activeNode;
+	var toNode;
+	var xxpath;
+	//var xpath;
+	var gmap_on=0;
+	var activeMarker; 
+	var icon1 = "images/city.png";
+    var icon2 = "images/city1.png";
+	var icon3 = "images/city2.png";
+	var markers=[];
+	var higlightPath;	
+	var refpos={"lat" : 6.89356, "lng" :79.90454}; //Sri Jpura Kotte
+	
+	//var graphwidth=800 ;
+	//var graphheight=450;
+	//var graphwidth =800;
+    //var graphheight = 500;
+	
+	//var graphR; //Ratio
+
+	
+	// vars for developement only
+var development=1;
+var lat_shift=0;
+var lng_shift=0;
+var trackmarker_id=999;
+var tracking_on=0;
+var track_marker_on=0;
+var track_marker;
+
+
+var mylat=homelat;
+var mylng=homelng;
+var myaccuracy;
+//var myalt;
+//var myaltitudeAccuracy;
+//var myheading;
+//var myspeed;
+var mytimestamp;
+var highaccuracy=true;
+//var Geodistance=0;
+var maploaded=false;
+var gps_location_on=0;	
+var gps_location_ok=0;
+//var ls_gps_location_ok=0;
+var gps_ntries=0;
+var autocomplete1;
+var autocomplete2;
+var watchProcess=null;
+
+var origin,destination,travelMode;
+  
+var Geoposition = function(latitude, longitude) {
+        this.latitude = latitude;
+        this.longitude  = longitude;
+}
+
+var currpos = new Geoposition();
+
+var appdata="_user_appdata";
+
+
+
+function init(){
+//DEVELOPMENT DATA
+//loadGraph(); // only needed to create full nodes[] first time and use nodesJSON=JSON.stringify(nodes) to get nodes JSON;
+//debugger; // stop here and get nodes & graph from console and put in loadGraphEdges to optimize app
+
+//PRODUCTION FROM HERE IF DEVELOPMENT DATA DONE :)
+getLocation();
+initdata("colombo");
+//activeNode=graph.activeNode;
+
+if (gmap_on==0) {   
+    graphSVG();
+}
+else{
+   graphGMAP();
+}
+//drawGMAPEdges(nodes,graph);
+
+}
+
+function trackme(idx){
+
+	if (gps_location_on==1 && gmap_on==1) {
+		var ele=document.getElementById(idx);
+		if (tracking_on==0) {
+			watchlocationGMAP();
+			ele.value="Tracking";
+		}
+		else{
+			stop_watchlocationGMAP();
+			ele.value="Track";
+		}
+	}
+}
+
+function watchlocationGMAP() {
+    if (watchProcess == null) {
+	    notification("Geo tracking ...!");
+        watchProcess = navigator.geolocation.watchPosition(handle_geolocation_query, handle_GPS_error);
+    }
+}
+
+function stop_watchlocationGMAP() {
+    if (watchProcess != null)
+    {
+        navigator.geolocation.clearWatch(watchProcess);
+        watchProcess = null;
+		tracking_on=0;
+    }
+}
+
+
+
+function handle_geolocation_query(position) {
+
+    mylat=position.coords.latitude;
+	mylng=position.coords.longitude;
+	myaccuracy=position.coords.accuracy;
+	mytimestamp=position.timestamp;
+	//myheading=position.coords.heading;
+	//myspeed=position.coords.speed;
+	//myalt=position.coords.altitude;
+	//myaltitudeAccuracy=position.coords.altitudeAccuracy
+	currpos.latitude=mylat;
+	currpos.longitude=mylng;
+	
+	/*
+    if (development==1) { // Testing
+	    // become global var at development
+		if (typeof lat_shift=== "undefined") {
+			lat_shift=0.001;
+			lng_shift=0.001;
+		}
+		else {
+			lat_shift=lat_shift+0.001;
+			lng_shift=lng_shift+0.001;
+		}
+		mylat=mylat+lat_shift;
+		mylng=mylng+lng_shift;
+	}
+	*/
+	
+	
+	//debugger;
+	var d = new Date(mytimestamp);
+    var ts= d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds () + " " + d.getDate() + "/" + d.getDate() +  "/" + d.getMonth()  +  "/" + d.getFullYear() % 100 + " SLST";
+	var text = "Lat: "  + round(mylat,7)  + " Lng: " + round(mylng,7) + " (Acc:"  + myaccuracy  + "m)" + " " + ts; 
+	
+	gps_location_ok=1; // gps enabled
+	gps_location_on=1; // gps read
+	
+	if ((tracking_on==0) && (track_marker_on==0)) {
+		track_marker = new google.maps.Marker({
+		position: {lat: mylat, lng: mylng},
+		map: map,
+		icon: 'images/dir_0.png',
+		title: 'You!'
+		});
+		track_marker.id=999;
+	}
+	else {
+	    //debugger;
+		track_marker.setPosition( new google.maps.LatLng( mylat, mylng ) );	
+	}
+	tracking_on=1;
+	track_marker_on=1;
+	
+   map.panTo( new google.maps.LatLng( mylat, mylng ) );
+   //document.getElementById("info").innerHTML=text;
+   msg=text;
+   notification(msg);
+}
+
+
+function startGMap() {
+  var ele = document.querySelector("#map");
+  ele.style.width=graphwidth;
+  ele.style.height=graphheight;
+  document.getElementById('floating-panel').style.visibility = 'visible';
+  document.getElementById('track').style.visibility = 'visible';
+ 
+ var directionsService = new google.maps.DirectionsService;
+ var directionsDisplay = new google.maps.DirectionsRenderer;
+  
+  map = new google.maps.Map(document.getElementById('map'), {
+    zoom: 13,
+    center: {lat: mylat, lng: mylng} //center: {lat: -34.397, lng: 150.644}
+  });
+  
+  	track_marker = new google.maps.Marker({
+		position: {lat: mylat, lng: mylng},
+		map: map,
+		icon: 'images/dir_0.png',
+		title: 'You'
+		});
+		
+		track_marker.id=999;
+		track_marker_on=1;
+	
+  directionsDisplay.setMap(map);
+
+  var displayRoute = function() {
+    calculateAndDisplayRoute(directionsService, directionsDisplay);
+  };
+  
+  
+  var input_from = document.getElementById('start');
+  var input_to = document.getElementById('end');
+ 
+    var options = {
+        componentRestrictions: {country: 'lk'}
+    };
+	
+    autocomplete1 = new google.maps.places.Autocomplete(input_from, options);
+	autocomplete2 = new google.maps.places.Autocomplete(input_to, options);
+	
+	autocomplete1.addListener('place_changed',  displayRoute);
+	autocomplete2.addListener('place_changed', displayRoute);
+}
+
+
+function calculateAndDisplayRoute(directionsService, directionsDisplay) {
+
+if ((document.getElementById('start').value == "") && (document.getElementById('end').value == "")) {
+	return false;
+}
+  
+if (document.getElementById('start').value != "" && document.getElementById('end').value == ""){
+	var place = autocomplete1.getPlace();
+	var xlat= place.geometry.location.lat();
+	var xlng= place.geometry.location.lng();
+	map.panTo( new google.maps.LatLng( xlat, xlng ) );
+	return false;
+}
+
+  directionsService.route({
+    origin: document.getElementById('start').value,
+    destination: document.getElementById('end').value,
+    travelMode: google.maps.TravelMode.DRIVING
+  }, function(response, status) {
+    if (status === google.maps.DirectionsStatus.OK) {
+	  
+	  directionsDisplay.setOptions({polylineOptions: { strokeColor: '#5FB404' }, preserveViewport: true });
+      directionsDisplay.setDirections(response);
+    } else {
+      notification('Directions failed :' + status);
+    }
+  });
+}
+
+
+//used for one time location read
+function getLocation() {
+     notification("Reading Geolocation");
+	 
+	 //debugger;
+    if (navigator.geolocation) {
+	    gps_location_on=1;
+		gps_ntries++;
+	    if (highaccuracy==true){
+		navigator.geolocation.getCurrentPosition(readPosition,handle_GPS_error,{'enableHighAccuracy':true,'timeout':10000,'maximumAge':0});
+		}
+		else{
+			navigator.geolocation.getCurrentPosition(readPosition,handle_GPS_error);
+		}
+    } else { 
+	    notification("Geolocation not supported");
+		gps_location_on=0;
+    }
+}
+//read location once and update global data once
+function readPosition(position) {
+    mylat=position.coords.latitude;
+	mylng=position.coords.longitude;
+	//myalt=position.coords.altitude;
+	//myheading=position.coords.heading;
+	//myspeed=position.coords.speed;
+	myaccouracy=position.coords.accuracy;
+	currpos.latitude=position.coords.latitude;
+	currpos.longitude=position.coords.longitude;
+	mytimestamp=position.coords.timestamp;
+	msg="Lat: " + mylat + " Lng : " +   mylng + " Acc : " + myaccouracy ;
+	notification(msg);
+	gps_location_ok=1;
+	gps_ntries=0; // reset	
+}
+
+
+function handle_GPS_error(err) {
+  
+  //errmsg=["","User denied geolocation", "Position unavailable.", "Timeout expired", ]
+  //document.getElementById("heading").innerHTML=err.code + " : " + err.message;
+  gps_location_on=0;
+  switch(err.code) {
+        case err.PERMISSION_DENIED:
+            msg = "User denied the request for Geolocation."
+            break;
+        case err.POSITION_UNAVAILABLE:
+             msg = "Location information is unavailable."
+            break;
+        case err.TIMEOUT:
+             msg = "The request to get user location timed out."
+            break;
+        case err.UNKNOWN_ERROR:
+             msg = "An unknown error occurred."
+            break;
+    }
+	
+	msg= err.code + ": " + msg;
+	notification (msg);
+}
+
+function getClosestCity(){
+var mind=Infinity;
+var minNode;
+	for (var i = 0; i < NUMBER_NODES; i++) {
+		d=getDistanceFromLatLonInM(currpos.latitude,currpos.longitude,nodes[i].lat,nodes[i].lng);
+		if (d < mind) {
+			mind=d;
+			minNode=i;
+		}
+	}
+	if (mind < 1000) {
+	  activeNode=minNode;
+	}
+	//activeNode=randomNode(); for testing
+}
+
+	    
+	
+
+ 
+  
+function loadGraphEdges(){
+var x='[{"name":"Armour St","zip":"armst","lat":6.94346,"lng":79.86423,"x":8890445,"y":774841,"bus":["138/1","143","152","155","176","6","934349"],"cons":[37,60,75]},{"name":"Angoda","zip":"10600.1","lat":6.93602,"lng":79.925697,"x":8897287,"y":774006,"bus":["143","150","152","154","164","166","714","79","855124"],"cons":[19,26,30,36,38]},{"name":"Angulana","zip":"10400.1","lat":6.79855,"lng":79.87294,"x":8891415,"y":758593,"bus":["101","102","154"],"cons":[70]},{"name":"Athurugiriya","zip":"10150","lat":6.87078,"lng":79.99884,"x":8905430,"y":766691,"bus":["123","138/4","17","170","190","255","697","992"],"cons":[39,43]},{"name":"Ayurveda Junction","zip":"ayur","lat":6.91096,"lng":79.8877,"x":8893058,"y":771196,"bus":["150","168","170","171","174","175","177","186","190"],"cons":[69,8,9]},{"name":"Bambalapitiya","zip":"400","lat":6.886473,"lng":79.8562826,"x":8889560,"y":768451,"bus":["0","100","101","102","104","112","132","136","154","155","179","256"],"cons":[21,35,46,79,87]},{"name":"Battaramulla","zip":"10120","lat":6.902104,"lng":79.919636,"x":8896613,"y":770203,"bus":["152","154","163","17","170","171","174","176","177","183","186","190"],"cons":[22,43,66,74,76]},{"name":"Boralesgamuwa","zip":"10290","lat":6.84117,"lng":79.90179,"x":8894626,"y":763371,"bus":["119","120","139","152","163","168","174","190"],"cons":[28,42,62,65,71]},{"name":"Borella","zip":"800","lat":6.915074,"lng":79.877401,"x":8891911,"y":771658,"bus":["","103","104","131","135","144","150","153","154","155","160","164","165","168","171","174","175","176","177","179","186","190","193","714"],"cons":[14,24,4,44,68,69,80,9]},{"name":"Borella Cemetry","zip":"800.4","lat":6.908896,"lng":79.877315,"x":8891902,"y":770965,"bus":["103","104","131","135","150","154","168","171","174","176","178","179","190","714"],"cons":[10,4,52,69,8,81]},{"name":"BMICH","zip":"700.3","lat":6.900277,"lng":79.866248,"x":8890670,"y":769998,"bus":["104","114","154","155","179"],"cons":[11,24,77,79,81,9]},{"name":"CMB Campus","zip":"700.5","lat":6.90508,"lng":79.86267,"x":8890271,"y":770537,"bus":["138","154","155"],"cons":[10,72,79,81]},{"name":"Dehiwala","zip":"10350","lat":6.8559485,"lng":79.8629683,"x":8890304,"y":765028,"bus":["100","101","102","118","119","132","154","155","163","17","176","183","198","256","345"],"cons":[27,28,51,87]},{"name":"Delkanda","zip":"delkd","lat":6.86301,"lng":79.90147,"x":8894590,"y":765820,"bus":["138"],"cons":[47,53,57,71,82]},{"name":"Dematagoda","zip":"900","lat":6.9353,"lng":79.88138,"x":8892354,"y":773926,"bus":["104","125","131","135","140","143","152","154","155","164","166","178","193","714"],"cons":[36,44,58,68,8]},{"name":"D.r. Wije Rd","zip":"1000.1","lat":6.930354,"lng":79.877932,"x":8891970,"y":773371,"bus":["113","114","115","120","122","125"],"cons":[16,40,44,83]},{"name":"Fort","zip":"100","lat":6.935116,"lng":79.841906,"x":8887960,"y":773905,"bus":["100","101","102","103","107","112","113","115","120","122","125","132","135","138","138/1","138^1","144","145","154","16","160","168","170","171","187","188","218","256","333","356","738"],"cons":[15,17,33,37,40,64,73]},{"name":"Galle Face","zip":"100.3","lat":6.92102,"lng":79.8465,"x":8888471,"y":772324,"bus":["100","101","102","112","256"],"cons":[16,18,35,40,73]},{"name":"Gangaramaya","zip":"200.1","lat":6.91869,"lng":79.85399,"x":8889305,"y":772063,"bus":["100","101","102","112","145","150","166"],"cons":[17,35,41,55,73,80]},{"name":"Gothatuwa","zip":"10600.2","lat":6.923026,"lng":79.913337,"x":8895911,"y":772549,"bus":["152","164","166","175"],"cons":[1,36,69,85]},{"name":"Grandpass","zip":"granp","lat":6.95097,"lng":79.87417,"x":8891551,"y":775683,"bus":["136","138/1","152"],"cons":[56,58,60,68,78]},{"name":"Havelock Town","zip":"500.3","lat":6.885096,"lng":79.866959,"x":8890749,"y":768296,"bus":["112","120","122","125","131","135","138","198"],"cons":[5,52,59,77,87]},{"name":"Hokandara","zip":"10118","lat":6.8841,"lng":79.97455,"x":8902726,"y":768184,"bus":["190","255","689","993"],"cons":[26,43,6,61,76]},{"name":"Homagama","zip":"10200","lat":6.8414,"lng":80.0031,"x":8905904,"y":763397,"bus":["122","125","138","149","308","313","697"],"cons":[39]},{"name":"Horton Place","zip":"hortp","lat":6.91153,"lng":79.87091,"x":8891189,"y":771260,"bus":["177"],"cons":[10,8,80,81]},{"name":"Kadawatha","zip":"11850","lat":7,"lng":79.95,"x":8899993,"y":781182,"bus":["104","132","138/1","138^1","18","180","193","200","218","333","514","738"],"cons":[31]},{"name":"Kaduwela","zip":"kaduw","lat":6.93586,"lng":79.98413,"x":8903792,"y":773989,"bus":["143","17","177","255","697"],"cons":[1,22,30,31,43]},{"name":"Kalubowila","zip":"10350.1","lat":6.86458,"lng":79.87039,"x":8891131,"y":765996,"bus":["118","119","139","143","163","17","176","180","183","313"],"cons":[12,28,34]},{"name":"Karagampitiya","zip":"10350.1","lat":6.8478,"lng":79.87238,"x":8891352,"y":764114,"bus":["0","118","119","119/2","132","176","178"],"cons":[12,27,62,7]},{"name":"Katubedda","zip":"katub","lat":6.797459,"lng":79.888645,"x":8893163,"y":758471,"bus":["100","101","102","158","255"],"cons":[49,50,70]},{"name":"Kelaniya","zip":"11600","lat":6.953156,"lng":79.91911,"x":8896554,"y":775928,"bus":["132","135","150","154","224","226","230"],"cons":[1,26,31,38,63]},{"name":"Kirbathgoda","zip":"11830.1","lat":6.97783,"lng":79.92715,"x":8897449,"y":778695,"bus":["132","138/1","138^1","154","18","200","218","230","333","356","514","738"],"cons":[25,26,30,63]},{"name":"Kirulapone","zip":"500.1","lat":6.87851,"lng":79.87645,"x":8891805,"y":767558,"bus":["112","113","114","115","120","122","125","131","138","141","198","2"],"cons":[52,57,59]},{"name":"Kochchikade","zip":"kochi","lat":6.946811,"lng":79.856431,"x":8889577,"y":775217,"bus":["102","107","112","141","145","160","168","256"],"cons":[16,37,48]},{"name":"Kohuwala","zip":"10250.2","lat":6.867052,"lng":79.88464,"x":8892717,"y":766273,"bus":["118","119","120","135","139","160","162","163","176","180","183","313"],"cons":[27,57,59,62]},{"name":"Kollupitiya","zip":"300","lat":6.911482,"lng":79.849339,"x":8888787,"y":771255,"bus":["100","101","102","112","132","136","140","175","177","256"],"cons":[17,18,41,5,67,87]},{"name":"Kolonnawa","zip":"10600","lat":6.93302,"lng":79.89344,"x":8893697,"y":773670,"bus":["131","140","152","164","166","714"],"cons":[1,14,19,38,85,86]},{"name":"Kotahena","zip":"1300","lat":6.950219,"lng":79.857118,"x":8889653,"y":775599,"bus":["","102","107","112","122","139","140","145","155","160","168","176","256"],"cons":[0,16,33,75]},{"name":"Kotikawatta","zip":"kotikw","lat":6.936233,"lng":79.915483,"x":8896150,"y":774030,"bus":["164","166","714"],"cons":[1,30,36,86]},{"name":"Kottawa","zip":"10230.1","lat":6.84133,"lng":79.96517,"x":8901682,"y":763389,"bus":["119","122","123","125","131","138","138/4","152","17","171","174","255","296","308","313","342"],"cons":[23,3,61,65]},{"name":"Lake house","zip":"100.4","lat":6.932324,"lng":79.846663,"x":8888489,"y":773592,"bus":["100","101","102","113","115","120","138"],"cons":[15,16,17,73]},{"name":"Liberty J","zip":"libty","lat":6.912206,"lng":79.852043,"x":8889088,"y":771336,"bus":["175","177"],"cons":[18,35,46,67]},{"name":"Maharagama","zip":"10280","lat":6.84778,"lng":79.9265,"x":8897377,"y":764112,"bus":["112","119","122","123","125","131","138","17","177","190","192","256","308","313","341","345","993"],"cons":[53,61,65,7,76,82]},{"name":"Malambe","zip":"10115","lat":6.9036111,"lng":79.9547222,"x":8900518,"y":770372,"bus":["17","170","177","190","255","993"],"cons":[22,26,3,6]},{"name":"Maradana","zip":"1000","lat":6.9283333,"lng":79.8641667,"x":8890438,"y":773145,"bus":["103","132","136","140","144","155","164","171","176","178","993"],"cons":[14,15,60,68,75,8,80]},{"name":"Mattakkuliya","zip":"1500","lat":6.9742613,"lng":79.8758835,"x":8891742,"y":778295,"bus":["145","155","160","166","178"],"cons":[48]},{"name":"Milagiriya","zip":"milagr","lat":6.886828,"lng":79.859736,"x":8889945,"y":768490,"bus":["112","198"],"cons":[41,5,59,77,87]},{"name":"Mirihana","zip":"10250.1","lat":6.875632,"lng":79.900818,"x":8894518,"y":767235,"bus":["113","117","118","119","119/2","156","164","187"],"cons":[13,53,57,66,82]},{"name":"Modara","zip":"modr","lat":6.964501,"lng":79.869166,"x":8890994,"y":777200,"bus":["145","155","160"],"cons":[33,45,78]},{"name":"Moratuwa","zip":"10400","lat":6.77529,"lng":79.88253,"x":8892482,"y":755985,"bus":["100","101","102","152","158","17","183","190","192","255"],"cons":[29,50]},{"name":"Moratuwa Uni","zip":"morau","lat":6.795073,"lng":79.90418,"x":8894892,"y":758203,"bus":["158","255"],"cons":[29,49,65]},{"name":"Mount Lavinia","zip":"mount","lat":6.83319,"lng":79.8672,"x":8890776,"y":762476,"bus":["100","101","102","154","155","183","198","255","256"],"cons":[12,70]},{"name":"Narahenpita","zip":"500","lat":6.89717,"lng":79.87719,"x":8891888,"y":769650,"bus":["103","131","135","141","173","178","198"],"cons":[21,32,54,77,9]},{"name":"Navinna","zip":"navin","lat":6.8551,"lng":79.91347,"x":8895926,"y":764933,"bus":["117","138"],"cons":[13,42,47,82]},{"name":"Nawala","zip":"10250.1","lat":6.895171,"lng":79.889483,"x":8893256,"y":769426,"bus":["173","176","198"],"cons":[52,57,69]},{"name":"Nawaloka","zip":"nawlk","lat":6.92275,"lng":79.85247,"x":8889136,"y":772518,"bus":["145"],"cons":[18,73]},{"name":"Nawagampura","zip":"nawag","lat":6.950311,"lng":79.878511,"x":8892035,"y":775609,"bus":["104","135","154"],"cons":[20,58,63]},{"name":"Nugegoda","zip":"10250","lat":6.872042,"lng":79.890776,"x":8893400,"y":766832,"bus":["112","114","115","117","118","119","119/2","122","125","131","135","138","154","156","163","168","17","173","176","183","313","689","690","992"],"cons":[13,32,34,47,54,66,82]},{"name":"Orugodawatta","zip":"orugw","lat":6.944199,"lng":79.878361,"x":8892018,"y":774924,"bus":["104","107","135","136","138/1","143","152","154","178","193"],"cons":[14,20,56,60,78,86]},{"name":"Pamankada","zip":"600","lat":6.877281,"lng":79.869384,"x":8891019,"y":767420,"bus":["112","120","122","125","135","138","141","154"],"cons":[21,32,34,46,87]},{"name":"Panchikawatta","zip":"punch","lat":6.93455,"lng":79.86596,"x":8890637,"y":773842,"bus":["107","138/1","143","144","152","155","176"],"cons":[0,20,44,58,75]},{"name":"Pannipitiya","zip":"10230","lat":6.84426,"lng":79.95547,"x":8900602,"y":763718,"bus":["119","122","123","125","131","138","174","255","313","993"],"cons":[22,39,42,76]},{"name":"Pepiliyana","zip":"10250.3","lat":6.856658,"lng":79.890556,"x":8893376,"y":765108,"bus":["117","120","139","152","313"],"cons":[28,34,7,71]},{"name":"Peliyagoda","zip":"11830","lat":6.95588,"lng":79.88315,"x":8892551,"y":776234,"bus":["104","107","132","135","136","138/1","139","154","187","188","193","240","260","261","274","275"],"cons":[30,31,56,78,84]},{"name":"Pettah","zip":"1100","lat":6.934199,"lng":79.851044,"x":8888977,"y":773802,"bus":["100","101","102","103","114","115","120","122","125","138","138/1","143","144","152","162","168","170","171","18","180","188","190","2","200","224","226","230","240","260","333","6","738","79","855124","934349"],"cons":[16,75]},{"name":"Piliyandala","zip":"10300","lat":6.8018,"lng":79.92268,"x":8896952,"y":758957,"bus":["120","139","149","158","162","17","255","296","341","342"],"cons":[39,42,50,7]},{"name":"Pita Kotte","zip":"Pitako","lat":6.883925,"lng":79.901491,"x":8894593,"y":768165,"bus":["114","115","118","153","156","163","168","174"],"cons":[47,57,6,74]},{"name":"Public Library","zip":"publib","lat":6.91369,"lng":79.85814,"x":8889767,"y":771502,"bus":["120","136","138","155","177"],"cons":[35,41,72,73,79,80,81]},{"name":"Punchi Borella","zip":"1000.2","lat":6.92138,"lng":79.87113,"x":8891213,"y":772365,"bus":["103","136","144","166","171","193"],"cons":[14,20,44,8,80]},{"name":"Rajagiriya","zip":"10107","lat":6.909515,"lng":79.896153,"x":8893999,"y":771034,"bus":["144","150","153","154","160","168","170","171","174","175","176","177","179","183","186","190","198"],"cons":[19,4,54,74,8,85,9]},{"name":"Ratmalana","zip":"10390","lat":6.81955,"lng":79.8739,"x":8891521,"y":760947,"bus":["100","101","102","112","117","154","179","183","255","256"],"cons":[2,29,51]},{"name":"Rattanapitiya","zip":"ratpy","lat":6.848415,"lng":79.897622,"x":8894162,"y":764183,"bus":["120","139"],"cons":[13,62,7]},{"name":"Royal Junior","zip":"royj","lat":6.90604,"lng":79.85877,"x":8889837,"y":770645,"bus":["138"],"cons":[11,67,79]},{"name":"Slave Island","zip":"200","lat":6.9257119,"lng":79.8503314,"x":8888898,"y":772851,"bus":["101","102","138","145","166","168"],"cons":[16,17,18,40,55,67,83]},{"name":"Sri Jpura Kotte","zip":"10100","lat":6.904686,"lng":79.90539,"x":8895027,"y":770493,"bus":["138","144","153","154","16","160","163","168","171","179","186","190","198","690"],"cons":[6,66,69,76]},{"name":"Technical Junction","zip":"techJ","lat":6.93225,"lng":79.86057,"x":8890037,"y":773584,"bus":["103","138/1","143","144","152","171"],"cons":[0,37,44,60,64]},{"name":"Thalawathugoda","zip":"10116","lat":6.87646,"lng":79.93533,"x":8898360,"y":767328,"bus":["174","689"],"cons":[22,42,6,61,74,82]},{"name":"Thimbirigasyaya","zip":"500.2","lat":6.88853,"lng":79.86411,"x":8890432,"y":768681,"bus":["112","113","114","115","120","122","125","135","138","174","198"],"cons":[10,21,46,52,79]},{"name":"Thota langa","zip":"thota","lat":6.95874,"lng":79.87591,"x":8891745,"y":776554,"bus":["107","173","240","260","261","274","275"],"cons":[20,48,58,63]},{"name":"Thummulla","zip":"500.1","lat":6.89714,"lng":79.85982,"x":8889954,"y":769647,"bus":["104","120","122","125","135","138","154"],"cons":[10,11,5,67,72,77,81]},{"name":"Town Hall","zip":"700.1","lat":6.91732,"lng":79.864741,"x":8890502,"y":771910,"bus":["113","114","120","122","125","136","138","140","150","155","160","162","164","165","166","175","190","193","218"],"cons":[18,24,44,67,68,8,81,83]},{"name":"Torington","zip":"700.3","lat":6.90799,"lng":79.86482,"x":8890511,"y":770863,"bus":["113","114","115","138","154","155","166","179"],"cons":[10,11,24,67,79,80,9]},{"name":"Udahamulla","zip":"10250.2","lat":6.867527,"lng":79.910052,"x":8895546,"y":766326,"bus":["113","117","119","689"],"cons":[13,42,47,53,57,76]},{"name":"Union Place","zip":"200.2","lat":6.92011,"lng":79.8583,"x":8889785,"y":772222,"bus":["113","114","115","120","125","138","168","689"],"cons":[15,73,80]},{"name":"Wattala","zip":"11300","lat":6.9807201,"lng":79.8986399,"x":8894275,"y":779019,"bus":["104","107","136","187","188","240","260","261","274","275"],"cons":[63]},{"name":"Welikada","zip":"weli","lat":6.92343,"lng":79.89108,"x":8893434,"y":772595,"bus":["150","166","171","174","175","177"],"cons":[19,36,69]},{"name":"Wellampitiya","zip":"10600.1","lat":6.937255,"lng":79.896128,"x":8893996,"y":774145,"bus":["131","140","143","164","166"],"cons":[36,38,58]},{"name":"Wellawatta","zip":"600","lat":6.87508,"lng":79.86091,"x":8890075,"y":767173,"bus":["100","101","102","136","141","154","198","256"],"cons":[12,21,35,46,5,59]}]';
+nodes= JSON.parse(x);
+//graph=JSON.parse('{"maxx":15498557,"maxy":779236,"minx":15393153.434904033,"miny":754221}');
+graph=JSON.parse('{"maxx":8906700,"maxy":782000,"minx":8887500,"miny":755000,"activeNode":80}');
+}
+
+function graphGMAP(){
+gmap_on=1;
+if (gps_location_on==1){
+    getLocation();
+	getClosestCity();
+}
+setGraphScale(graph);
+startGMap();
+//drawGMAPEdges(nodes,graph);
+drawGMAPNodes(nodes,graph);
+giveShotestPathGMAP(activeNode) ; 
+}
+
+function graphSVG(){
+ 
+if (gps_location_on==1){
+    getLocation();
+	getClosestCity();
+}
+setGraphScale(graph);
+canvas = createSVGcanvas( graphwidth , graphheight , container );  
+drawSVGEdges(nodes,graph);
+drawSVGNodes(nodes,graph);
+giveShotestPathSVG(activeNode) ; 
+}
+
+
+
+function initdata(city){
+//load city data
+loadGraphEdges(city);
+initMatrix();
+activeNode=graph.activeNode;
+}
+
+function switchmap(ele){
+var ele1=document.getElementById(ele);
+gmap_on=Math.abs(gmap_on-1);
+if (gmap_on==1) {
+ if (document.querySelector("svg")) {
+        var ele = document.querySelector("svg");
+        ele.parentNode.removeChild(ele);
+  }
+document.querySelector("#map").style="";
+graphGMAP();
+ele1.value="SVG";
+}
+else{
+	if (tracking_on==1) {
+	//stop watch process
+		stop_watchlocationGMAP();
+	}
+	track_marker_on=0;
+	if (document.querySelector(".gm-style")) {
+        var ele = document.querySelector(".gm-style");
+        ele.parentNode.removeChild(ele);
+    }
+	document.querySelector("#map").style="";
+	graphSVG();
+	ele1.value="Gmap";
+	}
+}
+	  
+
+
+function initMatrix(){
+     NUMBER_NODES=nodes.length;
+	 //adjacencyMatrix=[NUMBER_NODES];
+	 
+	for (var i = 0; i < NUMBER_NODES; i++) {
+	    adjacencyMatrix[i] = [NUMBER_NODES];
+        for (var j = 0; j < NUMBER_NODES; j++) {
+          adjacencyMatrix[i][j] = Infinity;
+        }
+	}
+	for (var from = 0; from < NUMBER_NODES; from++) {
+        for (var j = 0; j < nodes[from].cons.length; j++) {
+			var to=nodes[from].cons[j];
+		    if (adjacencyMatrix[from][to] = Infinity) {
+			    
+			    d=getDistanceFromLatLonInM(nodes[from].lat,nodes[from].lng,nodes[to].lat,nodes[to].lng);
+				//var dx = nodes[from].x - nodes[to].x;
+				//var dy = nodes[from].y - nodes[to].y;
+				//var d = Math.sqrt(dx * dx + dy * dy);
+				
+				adjacencyMatrix[from][to]=parseInt(d);
+				adjacencyMatrix[to][from]=parseInt(d);
+				//x= from + ":f t:" + to + " " + nodes[from].name + " > " + nodes[to].name  + " " + d;
+				//debugdata.push(x);
+	
+			}
+	   }
+	}	
+}
+
+function drawGMAPEdges(nodes,graph){
+var x1,x2,y1,y2,l;
+var from=0;
+var to=0;
+
+var idx="";
+
+for (var from = 0; from < NUMBER_NODES; from++) { 
+	for (var to = 0; to < NUMBER_NODES; to++) { 
+	     
+	    if (adjacencyMatrix[from][to] !=Infinity) {
+			       // console.log(floor + ":f c:" + cell + " routes" + routes);
+			
+					
+					if (to < from) {
+							idx = "L" + String(to) + "_" + from;
+					} else {
+							idx = "L" + String(from) + "_" + to;
+					}
+					
+					
+					//debugger;
+					/*var x='[{lat: ' + nodes[from].lat + ', lng: ' + nodes[from].lng + '},{lat: ' + nodes[to].lat+ ', lng: ' + nodes[to].lng +'}]';
+					
+					//var edgename = idx;
+					var flightPathCoordinates = JSON.parse(x);*/
+					
+					var flightPathCoordinates=[{lat: nodes[from].lat , lng: nodes[from].lng },{lat: nodes[to].lat, lng: nodes[to].lng}];
+					
+					flightPath = new google.maps.Polyline({
+					path: flightPathCoordinates,
+					strokeColor: '#FF0000',
+					strokeOpacity: 0.6,
+					strokeWeight: 1,
+					info:idx
+					});
+					flightPath.setMap(map);
+					//console.log(flightPath.getId ());
+		}
+	}			
+}
+}
+
+
+function drawGMAPNodes(nodes,graph){
+var x1,y1,cname,iconx;
+markers=[];
+  
+      // Add the circles for the nodes
+	for (var i = 0; i < NUMBER_NODES; i++) {
+        var myLatLng = {lat: nodes[i].lat, lng: nodes[i].lng};
+		var cname=nodes[i].name;
+		var ci=i + "." + cname;
+		if (i==activeNode) {
+			iconx=icon2;
+		}
+		else {
+			iconx=icon1;
+		}
+		markers[i] = new google.maps.Marker({
+		position: myLatLng,
+		map: map,
+		title: cname,
+		label:cname,
+		icon: iconx,
+		info: ci
+		});
+		
+		if (i==activeNode) { activeMarker=markers[i];}
+		
+		google.maps.event.addListener(markers[i], 'click', function() {
+		    clearPathGMAP();
+			activeMarker.setIcon(icon1);
+			this.setIcon(icon2);
+			var arx=this.info.split(".");
+			activeNode=parseInt(arx[0]);
+			activeMarker=this;
+			shortestPathInfo = shortestPath(adjacencyMatrix, NUMBER_NODES, activeNode);
+		});
+		
+		google.maps.event.addListener(markers[i], 'mouseover', function() {
+			//info(markers[i].getAttribute("title"));
+			//console.log(this);
+			clearPathGMAP();
+			var arx=this.info.split(".");
+			var tnode=parseInt(arx[0]);
+		
+			if (tnode!=activeNode){
+				this.setIcon(icon3);
+				toNode=tnode;
+				showPathGMAP(toNode);
+			}
+		});
+		
+		google.maps.event.addListener(markers[i], 'mouseout', function() {
+			var arx=this.info.split(".");
+			var tnode=parseInt(arx[0]);
+			if (tnode!=activeNode){
+				this.setIcon(icon1);
+				clearPathGMAP();
+			}
+		});
+			
+	}
+}
+
+
+function giveShotestPathGMAP(from){
+    activeNode =from;
+    shortestPathInfo = shortestPath(adjacencyMatrix, NUMBER_NODES, activeNode);
+}
+
+
+    // Show path from the active node to the given node
+function showPathGMAP(to) {
+	var strPath;
+	xxpath=[];
+      if (activeNode != to) {
+        //var path = constructPath(shortestPathInfo, to);
+		path = constructPath(shortestPathInfo, to); //array of shortest path nodes
+        var prev = activeNode;
+        var distance = 0;
+		strPath=nodes[activeNode].name;
+		
+        for (var i = 0; i < xxpath.length; i++) {
+        
+		 var id;
+          if (xxpath[i] < prev) {
+            id = "L" + xxpath[i] + "_" + prev;
+          } else {
+            id = "L" + prev + "_" + xxpath[i];
+          }
+          
+		  distance += adjacencyMatrix[prev][xxpath[i]];
+		  strPath=strPath +  " >  " + nodes[xxpath[i]].name  + " > ";
+          prev = xxpath[i];
+        }
+		//document.getElementById("d").firstChild.nodeValue = "Distance: " + distance;
+		//var roughscale=Math.sqrt(graph.ratio.latr * graph.ratio.latr + graph.ratio.lngr * graph.ratio.lngr);
+		var skydistance=round((distance/1000),1); 
+		strPath=strPath.slice(0, -1) ;
+		highlightPathGMAP();
+		busx=getbusses(activeNode,to);
+		info(strPath + " " + skydistance + "km Bus: " + busx );
+		
+      }
+    }
+
+	
+	
+// Hide the path highlights
+function clearPathGMAP() {
+     //get the path object and process
+	if (isVarExsist(higlightPath)) {
+	higlightPath.setMap(null);
+	}
+}
+
+function highlightPathGMAP() {
+   var flightPathCoordinates = [];
+   
+    flightPathCoordinates.push({lat: nodes[activeNode].lat, lng: nodes[activeNode].lng});
+     //get the path object and process
+	 for (var i = 0; i < path.length; i++) {
+		flightPathCoordinates.push({lat: nodes[path[i]].lat, lng: nodes[path[i]].lng});
+     //get the path object and process
+	 }
+	 higlightPath= new google.maps.Polyline({
+	 path: flightPathCoordinates,
+     strokeColor: '#FF0000',
+     strokeOpacity: 1.0,
+     strokeWeight: 2
+	 });
+	 higlightPath.setMap(map);
+
+}
+
+    // Unhighlight the path fr
+
+function drawSVGEdges(nodes,graph){
+var x1,x2,y1,y2,l;
+var from=0;
+var to=0;
+
+for (var from = 0; from < NUMBER_NODES; from++) { 
+	for (var to = 0; to < NUMBER_NODES; to++) { 
+	     
+	    if (adjacencyMatrix[from][to] !=Infinity) {
+			       // console.log(floor + ":f c:" + cell + " routes" + routes);
+					
+					id = "L";
+					if (to < from) {
+							id += String(to) + "_" + from;
+					} else {
+						id += String(from) + "_" + to;
+					}
+					
+					id="L" + from +"_" + to;
+					x1=parseInt((nodes[from].x - graph.minx)  * graph.ratio.lngr);
+					y1=parseInt((graph.maxy - nodes[from].y) * graph.ratio.latr);
+					x2=parseInt((nodes[to].x - graph.minx)  * graph.ratio.lngr);
+					y2=parseInt((graph.maxy  - nodes[to].y) * graph.ratio.latr);
+					createSVGline(id, x1, y1, x2, y2, '2E9AFE', 1);	
+			}
+		
+	}
+}			
+}
+
+function drawSVGNodes(nodes,graph){
+var x1,y1,cname;
+divider = document.createElementNS(SVG_NAMESPACE_URI, "g");
+canvas.appendChild(divider);
+      // Add the circles for the nodes
+	for (var i = 0; i < NUMBER_NODES; i++) {
+		cname=nodes[i].name;
+		x1=parseInt((nodes[i].x - graph.minx)  * graph.ratio.lngr);
+		y1=parseInt((graph.maxy-nodes[i].y) * graph.ratio.latr);
+		createSVGcircle(i,x1,y1,16,cname);
+		//canvas.appendChild(c);
+	}
+}
+
+function giveShotestPathSVG(from){
+
+    activeNode =from;
+	var activeZip="c"+activeNode;
+	var activeText="t"+activeNode;
+	document.getElementById(activeZip).setAttributeNS(null, "class", "current");
+	document.getElementById(activeText).setAttributeNS(null, "class", "current");
+    shortestPathInfo = shortestPath(adjacencyMatrix, NUMBER_NODES, activeNode);
+}
+
+
+// Hide the path highlights
+function clearPathSVG() {
+      for (var i = 0; i < NUMBER_NODES; i++) {
+        for (var j = i + 1; j < NUMBER_NODES; j++) {
+          if (adjacencyMatrix[i][j] != Infinity) {
+			var aline=document.getElementById("L" + i + "_" + j)
+            aline.setAttributeNS(null, "class", "");
+          }
+        }
+      }
+    }
+
+    // Show path from the active node to the given node
+function showPathSVG(to) {
+	
+      clearPathSVG();
+	  
+      if (activeNode != to) {
+        var c = document.getElementById("c" + to);
+        c.setAttributeNS(null, "class", "highlight");
+        //var path = constructPath(shortestPathInfo, to);
+		xxpath = constructPath(shortestPathInfo, to); //array of shortest path nodes
+        var prev = activeNode;
+        var distance = 0;
+		strPath=nodes[activeNode].name;
+		var tnode=document.getElementById("t" + to);
+	    tnode.setAttributeNS(null, "class", "highlight");
+		
+        for (var i = 0; i < xxpath.length; i++) {
+        
+		 var id;
+          if (xxpath[i] < prev) {
+            id = "L" + xxpath[i] + "_" + prev;
+          } else {
+            id = "L" + prev + "_" + xxpath[i];
+          }
+          var l = document.getElementById(id);
+          l.parentNode.removeChild( l);
+          l.setAttributeNS(null, "class", "highlight");
+         // document.documentElement.insertBefore(l, divider);
+		  canvas.insertBefore(l, divider);
+          distance += adjacencyMatrix[prev][xxpath[i]];
+		  
+		  strPath=strPath +  " >  " + nodes[xxpath[i]].name  + " > ";
+          prev = xxpath[i];
+        }
+		//document.getElementById("d").firstChild.nodeValue = "Distance: " + distance;
+		//var roughscale=Math.sqrt(graph.ratio.latr * graph.ratio.latr + graph.ratio.lngr * graph.ratio.lngr);
+		var skydistance=round((distance/1000),1); 
+		strPath=strPath.slice(0, -1) ;
+	
+		busx=getbusses(activeNode,to);
+		info(strPath + " " + skydistance + "km Bus: " + busx );
+      }
+    }
+
+    // Unhighlight the path from the active node to the given node
+function hidePathSVG(to) {
+      clearPathSVG();
+      if (activeNode != to) {
+        var c = document.getElementById("c" + to);
+		var t = document.getElementById("t" + to);
+        c.setAttributeNS(null, "class", "");
+		t.setAttributeNS(null, "class", "");
+      }
+    }
+
+    // Choose a new active node
+function setActiveSVG(newnode) {
+      var xnode=document.getElementById("c" + activeNode);
+	  var tnode=document.getElementById("t" + activeNode);
+	  xnode.setAttributeNS(null, "class", "");
+	  tnode.setAttributeNS(null, "class", "");
+      clearPathSVG();
+      activeNode = newnode;
+      shortestPathInfo = shortestPath(adjacencyMatrix, NUMBER_NODES, newnode);
+      document.getElementById("c" + activeNode).setAttributeNS(null, "class", "current");
+	  document.getElementById("t" + activeNode).setAttributeNS(null, "class", "current");
+
+    }
+
+function _clearChildren(xcontainer){
+	var myNode = document.getElementById(xcontainer);
+	var fc = myNode.firstChild;
+	while( fc ) {
+		myNode.removeChild( fc );
+		fc = myNode.firstChild;
+	}
+}
+
+
+	
+function getbusses(from, to){
+	var bx="";
+	for (var i = 0; i < nodes[from].bus.length; i++) {
+		for (var j = 0; j < nodes[to].bus.length; j++) {
+				if (nodes[to].bus[j]==nodes[from].bus[i]){
+					bx=bx + "." + nodes[to].bus[j];
+					var found=1;
+					break;	
+				}
+		}
+	}
+	if (found==1) {
+		bx=bx.substring(1);
+	}
+	return bx;
+}
+		
+function createSVGcanvas( width, height, containerId ){
+    var xcontainer = document.getElementById( containerId );
+    canvas = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    canvas.setAttribute('width', width);
+    canvas.setAttribute('height', height);
+	canvas.setAttribute('z-index',7);
+    xcontainer.appendChild( canvas );   	
+    return canvas;
+  }
+  
+  
+function createSVGline(id, x1, y1, x2, y2, color, w) {
+    var aLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+	aLine.setAttributeNS(null,'id', id);
+    aLine.setAttributeNS(null,'x1', x1);
+    aLine.setAttributeNS(null,'y1', y1);
+    aLine.setAttributeNS(null,'x2', x2);
+    aLine.setAttributeNS(null,'y2', y2);
+	//aLine.setAttribute(null,'stroke', color);
+    //aLine.setAttribute(null,'stroke-width', w);
+	canvas.appendChild(aLine);
+    //return aLine;
+  }
+
+
+function createSVGcircle(i,x, y,r,cname){
+        
+        var rx=0.004 * graphwidth;
+		if (r < rx) {rx=r;}
+		var c = document.createElementNS(SVG_NAMESPACE_URI, "circle");
+		//cname="c" + i;
+		var id="c" + i;
+		
+        c.setAttributeNS(null,"id", id);
+        c.setAttributeNS(null, "cx", x);
+        c.setAttributeNS(null, "cy", y);
+        c.setAttributeNS(null, "r", rx);
+		c.setAttributeNS(null,"fill", "CCFF00");
+        c.setAttributeNS(null, "onmouseover", "showPathSVG(" + i + ")");
+        c.setAttributeNS(null, "onmouseout", "hidePathSVG(" + i + ")");
+		c.setAttributeNS(null, "onclick", "setActiveSVG(" + i + ")");
+		canvas.appendChild(c);
+		var txtElem=createSVGtext(i,x, y,cname);
+		canvas.appendChild(txtElem);
+        //return c;
+}	
+
+function createSVGtext(i,x, y,text){
+	var txtElem = document.createElementNS(SVG_NAMESPACE_URI, "text");
+	var id="t" + i;
+	txtElem.setAttributeNS(null,"id", id);
+	txtElem.setAttributeNS(null,"x",x);
+	txtElem.setAttributeNS(null,"y",y);
+	txtElem.setAttributeNS(null,"text-anchor", "middle");
+	txtElem.setAttributeNS(null, "onmouseover", "showPathSVG(" + i + ")");
+    txtElem.setAttributeNS(null, "onmouseout", "hidePathSVG(" + i + ")");
+    txtElem.setAttributeNS(null, "onclick", "setActiveSVG(" + i + ")");
+	//txtElem.setAttributeNS(null,"font-weight","bold");
+	//txtElem.setAttributeNS(null,"font-size",10);
+	//txtElem.setAttributeNS(null,"font-family","Roboto");
+	var Txt = document.createTextNode(text);
+	txtElem.appendChild(Txt);
+    return txtElem;
+	
+}
+
+
+function graphSize(){
+graphwidth = (window.innerWidth|| document.documentElement.clientWidth);
+    graphheight = (window.innerHeight|| document.documentElement.clientHeight);
+	graphheight = graphheight -  90;
+	graphwidth=graphwidth-30;
+	if (graphwidth < 900) {graphwidth=967;}
+}
+
+//GMAP
+function initMap(){
+maploaded=true;
+msg='Map loaded';
+notification(msg);
+}
+
+
+function setGraphScale(graph){
+ graphSize();
+ var diflat=Math.abs((graph.maxy-graph.miny)); //lat diff m
+ var diflng=Math.abs((graph.maxx-graph.minx)); //lng diff m
+ graphwidthR=(graphwidth/diflng); //lng ratio
+ graphheightR=((graphheight)/diflat); //lat
+ graph.ratio={'latr':graphheightR,'lngr':graphwidthR};
+ return true;
+}
+
+
+
+/*
+function _setGraphScale(graph){
+	graphSize();
+	var diflat=Math.abs((graph.maxy-graph.miny)); //lat diff m
+	var diflng=Math.abs((graph.maxx-graph.minx)); //lng diff m
+	 
+    graphwidthR=(graphwidth/diflng); //lng ratio
+	graphheightR=((graphheight)/diflat); //lat
+	graph.ratio={'latr':graphheightR,'lngr':graphwidthR};
+	return true;
+}
+*/
+
+function getDistanceFromLatLonInM(lat1,lng1,lat2,lng2) {
+  var R = 6371; // Radius of the earth in km
+  var dLat = deg2rad(lat2-lat1);  // deg2rad below
+  var dLon = deg2rad(lng2-lng1); 
+  var a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+    ; 
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  var d = R * c * 1000; // Distance in m
+  return d;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180);
+}
+
+
+function allowDrop(ev) {
+    ev.preventDefault();
+}
+
+
+function drag(ev) {
+    ev.dataTransfer.setData("Text", event.target.id);
+	console.log(ev.target.id);
+    ev.target.style.border = "1px solid black";
+	ev.target.style.opacity = "0.4";
+}
+  
+function dragend(ev) {
+	var xw=parseInt((ev.target.style.width/2));
+	ev.target.style.border = "";
+	ev.target.style.opacity = "1";
+	ev.target.style.left=ev.screenX-50 + "px";
+	ev.target.style.top=ev.screenY-50 + "px"
+	ev.preventDefault();
+}
+
+
+function inputclear(x){
+document.getElementById(x).value="";
+}
+
+
+function info(x){
+	
+//var els = $("#log");
+//els.innerHTML=x;
+var l=document.getElementById("infobar");
+//l.innerHTML=l.innerHTML+x + "<hr/>";
+l.innerHTML=x;
+//console.log(x);
+//document.write(n + ' : ' + x + "<hr>");
+}
+
+
+
+function isVarExsist(variable){
+	if (typeof variable === 'undefined' || variable === null) {
+    // variable is undefined or null
+		return false;
+	}
+	else{
+		return true;
+	}
+}
+
+function round(value, decimals) {
+    return Number(Math.round(value+'e'+decimals)+'e-'+decimals);
+}
+
+
+
+function notification(msg) {
+
+ if (development==1){
+    //console.log(event);
+	console.log(msg + timex());
+ }
+  sethtml('infobar',msg);
+}
+
+function timex(){
+var d = new Date();
+return d.getTime();
+}
+
+
+function sethtml(id,html){
+document.getElementById(id).innerHTML=msg;
+}
+
+window.onerror = function(msg, url, line) {
+            debugger;
+            msg = 'Er L:' + line + ': ' + msg + ' - ' + url;
+            console.log(msg);
+}
+/////////////////////////////////////////////DEVELOPMENT ONLY - REMOVE ON PRODUCTION
+
+function ToWebMercator(mercatorY_lat, mercatorX_lon){
+    if ((Math.abs(mercatorX_lon) > 180 || Math.abs(mercatorY_lat) > 90))
+        return;
+
+   num = mercatorX_lon * 0.017453292519943295;
+   x = 6378137.0 * num;
+   a = mercatorY_lat * 0.017453292519943295;
+
+    mercatorX_lon = x;
+    mercatorY_lat = 3189068.5 * Math.log((1.0 + Math.sin(a)) / (1.0 - Math.sin(a)));
+	xx=mercatorX_lon;
+	yy=mercatorY_lat;
+	var ret={'dlat':yy,'dlng':xx};
+	return ret;
+}
+
+
+function ToGeographic(mercatorY_lat, mercatorX_lon)
+{
+    if (Math.abs(mercatorX_lon) < 180 && Math.abs(mercatorY_lat) < 90)
+        return;
+
+    if ((Math.abs(mercatorX_lon) > 20037508.3427892) || (Math.abs(mercatorY_lat) > 20037508.3427892))
+        return;
+
+   x = mercatorX_lon;
+   y = mercatorY_lat;
+   num3 = x / 6378137.0;
+   num4 = num3 * 57.295779513082323;
+   num5 = Math.floor(((num4 + 180.0) / 360.0));
+   num6 = num4 - (num5 * 360.0);
+   num7 = 1.5707963267948966 - (2.0 * Math.atan(Math.exp((-1.0 * y) / 6378137.0)));
+   mercatorX_lon = num6;
+   mercatorY_lat = num7 * 57.295779513082323;
+   xx= mercatorX_lon;
+   yy=mercatorY_lat ;
+	var ret={'dlat':yy,'dlng':xx};
+	return ret;
+
+}
+
+////////////////////////////////DROP in PRODUCTION
+
+function loadGraph() {
+//create detailed JSON from csv JSON input
+    var x='[{"name":"Armour St","zip":"armst","lat":6.94346,"lng":79.86423},{"name":"Angoda","zip":"10600.1","lat":6.93602,"lng":79.925697},{"name":"Angulana","zip":"10400.1","lat":6.79855,"lng":79.87294},{"name":"Athurugiriya","zip":"10150","lat":6.87078,"lng":79.99884},{"name":"Ayurveda Junction","zip":"ayur","lat":6.91096,"lng":79.8877},{"name":"Bambalapitiya","zip":"400","lat":6.886473,"lng":79.8562826},{"name":"Battaramulla","zip":"10120","lat":6.902104,"lng":79.919636},{"name":"Boralesgamuwa","zip":"10290","lat":6.84117,"lng":79.90179},{"name":"Borella","zip":"800","lat":6.915074,"lng":79.877401},{"name":"Borella Cemetry","zip":"800.4","lat":6.908896,"lng":79.877315},{"name":"BMICH","zip":"700.3","lat":6.900277,"lng":79.866248},{"name":"CMB Campus","zip":"700.5","lat":6.90508,"lng":79.86267},{"name":"Dehiwala","zip":"10350","lat":6.8559485,"lng":79.8629683},{"name":"Delkanda","zip":"delkd","lat":6.86301,"lng":79.90147},{"name":"Dematagoda","zip":"900","lat":6.9353,"lng":79.88138},{"name":"D.r. Wije Rd","zip":"1000.1","lat":6.930354,"lng":79.877932},{"name":"Fort","zip":"100","lat":6.935116,"lng":79.841906},{"name":"Galle Face","zip":"100.3","lat":6.92102,"lng":79.8465},{"name":"Gangaramaya","zip":"200.1","lat":6.91869,"lng":79.85399},{"name":"Gothatuwa","zip":"10600.2","lat":6.923026,"lng":79.913337},{"name":"Grandpass","zip":"granp","lat":6.95097,"lng":79.87417},{"name":"Havelock Town","zip":"500.3","lat":6.885096,"lng":79.866959},{"name":"Hokandara","zip":"10118","lat":6.8841,"lng":79.97455},{"name":"Homagama","zip":"10200","lat":6.8414,"lng":80.0031},{"name":"Horton Place","zip":"hortp","lat":6.91153,"lng":79.87091},{"name":"Kadawatha","zip":"11850","lat":7,"lng":79.95},{"name":"Kaduwela","zip":"kaduw","lat":6.93586,"lng":79.98413},{"name":"Kalubowila","zip":"10350.1","lat":6.86458,"lng":79.87039},{"name":"Karagampitiya","zip":"10350.1","lat":6.8478,"lng":79.87238},{"name":"Katubedda","zip":"katub","lat":6.797459,"lng":79.888645},{"name":"Kelaniya","zip":"11600","lat":6.953156,"lng":79.91911},{"name":"Kirbathgoda","zip":"11830.1","lat":6.97783,"lng":79.92715},{"name":"Kirulapone","zip":"500.1","lat":6.87851,"lng":79.87645},{"name":"Kochchikade","zip":"kochi","lat":6.946811,"lng":79.856431},{"name":"Kohuwala","zip":"10250.2","lat":6.867052,"lng":79.88464},{"name":"Kollupitiya","zip":"300","lat":6.911482,"lng":79.849339},{"name":"Kolonnawa","zip":"10600","lat":6.93302,"lng":79.89344},{"name":"Kotahena","zip":"1300","lat":6.950219,"lng":79.857118},{"name":"Kotikawatta","zip":"kotikw","lat":6.936233,"lng":79.915483},{"name":"Kottawa","zip":"10230.1","lat":6.84133,"lng":79.96517},{"name":"Lake house","zip":"100.4","lat":6.932324,"lng":79.846663},{"name":"Liberty J","zip":"libty","lat":6.912206,"lng":79.852043},{"name":"Maharagama","zip":"10280","lat":6.84778,"lng":79.9265},{"name":"Malambe","zip":"10115","lat":6.9036111,"lng":79.9547222},{"name":"Maradana","zip":"1000","lat":6.9283333,"lng":79.8641667},{"name":"Mattakkuliya","zip":"1500","lat":6.9742613,"lng":79.8758835},{"name":"Milagiriya","zip":"milagr","lat":6.886828,"lng":79.859736},{"name":"Mirihana","zip":"10250.1","lat":6.875632,"lng":79.900818},{"name":"Modara","zip":"modr","lat":6.964501,"lng":79.869166},{"name":"Moratuwa","zip":"10400","lat":6.77529,"lng":79.88253},{"name":"Moratuwa Uni","zip":"morau","lat":6.795073,"lng":79.90418},{"name":"Mount Lavinia","zip":"mount","lat":6.83319,"lng":79.8672},{"name":"Narahenpita","zip":"500","lat":6.89717,"lng":79.87719},{"name":"Navinna","zip":"navin","lat":6.8551,"lng":79.91347},{"name":"Nawala","zip":"10250.1","lat":6.895171,"lng":79.889483},{"name":"Nawaloka","zip":"nawlk","lat":6.92275,"lng":79.85247},{"name":"Nawagampura","zip":"nawag","lat":6.950311,"lng":79.878511},{"name":"Nugegoda","zip":"10250","lat":6.872042,"lng":79.890776},{"name":"Orugodawatta","zip":"orugw","lat":6.944199,"lng":79.878361},{"name":"Pamankada","zip":"600","lat":6.877281,"lng":79.869384},{"name":"Panchikawatta","zip":"punch","lat":6.93455,"lng":79.86596},{"name":"Pannipitiya","zip":"10230","lat":6.84426,"lng":79.95547},{"name":"Pepiliyana","zip":"10250.3","lat":6.856658,"lng":79.890556},{"name":"Peliyagoda","zip":"11830","lat":6.95588,"lng":79.88315},{"name":"Pettah","zip":"1100","lat":6.934199,"lng":79.851044},{"name":"Piliyandala","zip":"10300","lat":6.8018,"lng":79.92268},{"name":"Pita Kotte","zip":"Pitako","lat":6.883925,"lng":79.901491},{"name":"Public Library","zip":"publib","lat":6.91369,"lng":79.85814},{"name":"Punchi Borella","zip":"1000.2","lat":6.92138,"lng":79.87113},{"name":"Rajagiriya","zip":"10107","lat":6.909515,"lng":79.896153},{"name":"Ratmalana","zip":"10390","lat":6.81955,"lng":79.8739},{"name":"Rattanapitiya","zip":"ratpy","lat":6.848415,"lng":79.897622},{"name":"Royal Junior","zip":"royj","lat":6.90604,"lng":79.85877},{"name":"Slave Island","zip":"200","lat":6.9257119,"lng":79.8503314},{"name":"Sri Jpura Kotte","zip":"10100","lat":6.904686,"lng":79.90539},{"name":"Technical Junction","zip":"techJ","lat":6.93225,"lng":79.86057},{"name":"Thalawathugoda","zip":"10116","lat":6.87646,"lng":79.93533},{"name":"Thimbirigasyaya","zip":"500.2","lat":6.88853,"lng":79.86411},{"name":"Thota langa","zip":"thota","lat":6.95874,"lng":79.87591},{"name":"Thummulla","zip":"500.1","lat":6.89714,"lng":79.85982},{"name":"Town Hall","zip":"700.1","lat":6.91732,"lng":79.864741},{"name":"Torington","zip":"700.3","lat":6.90799,"lng":79.86482},{"name":"Udahamulla","zip":"10250.2","lat":6.867527,"lng":79.910052},{"name":"Union Place","zip":"200.2","lat":6.92011,"lng":79.8583},{"name":"Wattala","zip":"11300","lat":6.9807201,"lng":79.8986399},{"name":"Welikada","zip":"weli","lat":6.92343,"lng":79.89108},{"name":"Wellampitiya","zip":"10600.1","lat":6.937255,"lng":79.896128},{"name":"Wellawatta","zip":"600","lat":6.87508,"lng":79.86091}]';
+	nodes=JSON.parse(x);	
+    NUMBER_NODES=nodes.length;
+
+	//var refposxy=Conv.ll2m(refpos.lat, refpos.lng);
+	//debugdata.push(refposxy);
+	var refposxy=ToWebMercator(refpos.lat, refpos.lng);
+	//debugdata.push(refposxy);
+	var minx= parseInt(refposxy.dlng); // screen cordinates x (hz)
+	var miny= parseInt(refposxy.dlat);
+	var maxx= minx;
+	var maxy= miny;
+	
+	for (var i = 0; i < NUMBER_NODES; i++) {
+		//initialize Matrix
+		//adjacencyMatrix[i] = new Array(NUMBER_NODES);
+		cpos=nodes[i]; //for lat lng of current node
+		//var mpos=Conv.ll2m(cpos.lat, cpos.lng);//output mercator.x, mercator.y
+		//debugdata.push(mpos);
+		var mpos=ToWebMercator(cpos.lat, cpos.lng);
+		//debugdata.push(mpos);
+		nodes[i].x=parseInt(mpos.dlng); //   x / y switched for screen coordinates
+		nodes[i].y=parseInt(mpos.dlat);
+		
+		if (nodes[i].x > maxx  ) {maxx=nodes[i].x};
+		if (nodes[i].y > maxy ) {maxy=nodes[i].y};
+
+		if (nodes[i].x < minx  ) {minx=nodes[i].x};
+		if (nodes[i].y < miny ) {miny=nodes[i].y};
+		nodes[i].bus=[]; // initialize busses for this node
+		nodes[i].cons=[]; // initialize connections for this node
+	}	
+	graph.maxx=maxx;
+	graph.maxy=maxy;
+	graph.minx=minx;
+	graph.miny=miny;
+	loadEdges();
+	console.log(JSON.stringify(graph));
+	console.log(JSON.stringify(nodes));
+	debugger;
+}
+
+
+function loadEdges(){
+////create compacr JSON from csv JSON graph input and insert edges & busses in nodes 
+var edges=["0","152","0","0","0","155","0","0","0","0","0","155","155","0","143.152","0","0","0","0","152","0","0","0","0","0","0","143","0","0","0","0","0","0","0","0","0","152","*155","0","0","0","0","0","0","155","0","0","0","155","0","0","155","0","0","0","0","0","0","138/1.143.152","0","*155","0","152","0","143","0","0","0","0","0","0","0","0","0","0","*138/1.143.152","0","0","0","0","155","0","0","0","0","0","143","0","152.143","0","0","0","0","0","0","0","164.714","0","0","0","0","0","164.166.714.166.152","0","0","0","150.166","*152","0","0","0","0","0","0","*143","0","0","0","*150","0","0","0","0","0","*164.166.714.166.152","0","*166.164.166","0","0","0","0","0","164","0","0","164","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","152.143","0","0","0","166","150","0","0","0","166","0","0","0","0","0","0","164.166.150","0","0","0","0","150","164.166.143","0","0","0","0","0","0","102.154","0","0","154","0","0","0","102.154","0","154","0","102","0","0","0","0","0","0","0","0","0","0","0","0","0","154","154","0","0","0","0","0","102","0","0","0","0","0","0","0","0","0","0","0","102","0","154.101.102","0","0","0","0","0","0","0","0","0","0","0","154","0","0","0","0","0","0","*154.102","0","0","0","0","0","0","0","0","154","0","0","0","0","0","0","0","102.154","0","0","0","0","0","0","170","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","697","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*138/4.17.255.123","0","0","123","*170","0","0","0","0","0","17.255","0","0","0","0","0","0","0","0","0","0","0","123","0","0","170","17.255","0","0","0","170","0","0","0","0","0","0","0","0","0","0","190","0","0","0","0","0","0","0","0","150","0","190","0","0","190.171.177","0","*171.174","*888","0","0","0","0","0","0","170","0","0","0","0","0","190","0","0","0","177","0","0","0","0","0","0","0","0","177","0","0","0","174.171","0","0","177","190","171","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","174","0","0","190.171","0","0","0","0","*171.190.174","0","0","0","0","0","0","174","0","0","0","150","0","0","0","0","171","0","0","0","0","154","0","0","0","0","0","104.179","179","179","0","100.101.154","0","154","0","100.101.112","100.101.112.102","0","0","136","112","0","0","0","104","0","0","0.132","0","154","154","112","0","0","*100.101.112","0","112.102.256","0","0","0","0","112","0","0","0","*112","0","0","100.101.102","0","100","0","0","0","0","0","112","154","0","0","0","0","104.154","100.101","0","0","0","0","179","102.256","0","0","101","179","0","0","0","0","*888","0","179","0","0","0","0","0","*101.100.154","0","152","0","0","171","0","0","0","171","154","0","0","163","0","152","0","171","0","0","0","152","0","0","0","0","0","0","163","0","0","0","0","0","0","0","0","152","0","0","0","0","0","0","*888","171","0","0","0","0","0","0","0","0","0","0","0","0","163","0","0","0","0","0","0","171.152","0","163","0","0","183.171","0","0","0","0","*163.186","0","*174","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","119","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","150.164","154","0","0","0","177","0","0","*154.135.103.104","0","0","154","0","*104.154.164","0","103.144.168","0","150","0","0","0","0","0","*888","193","0","0","0","0","0","154","0","0","0","175.177","164","168.176","0","174","0","0","0","177","103.144","0","0","0","0","0","0","0","103","0","176","0","0","168.176","0","0","0","0","0","104.154.193","144","0","153","0","103","144.153.168","154","0","0","168","153.168","0","174","0","0","104.154","*150.164.175.193","0","0","168","104","0","164","154","0","0","154","0","*888","104.154","0","0","104","103","*154.104","0","0","0","104","0","103","0","0","0","0","135","0","0","0","0","0","0","0","0","135","154","0","0","135","0","0","0","0","0","0","0","0","0","103","0","0","0","0","0","0","0","*135.103","0","0","0","0","0","135.154.104","135","0","0","0","104.154","103","0","0","0","0","0","0","0","0","0","0","103","0","135","0","104.154","0","0","0","0","104","0","0","154","0","0","154","0","0","179.154.104","0","0","154.179","*154","0","*154","0","0","154","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","154","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","104","0","0","0","0","0","179","0","0","0","0","179","0","0","0","0","*104","0","*179","0","0","104","0","0","0","0","0","0","0","0","154","0","0","154","0","*154","0","154","0","154","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","0","0","0","0","0","0","0","0","138","0","0","0","138","154","0","0","0","0","154","0","0","0","0","0","0","0","0","*888","0","0","0","0","138","0","*138","138","138","0","0","0","0","0","154","0","0","102","0","0","100.102.101.155","163","163.119","176.155.154","0","154.155","0","0","0","154.155","0","100.101.102.154","0","0","0","0","0","0","0","0","132","0","*163.118","176.119.118","0","132","132.154","198","0","163.118.176","100.101.132","0","176.102.155","0","0","0","0","345.119","0","176.132.155","155","0","118","0","100.101.102","0","*100.101.102.154","198","0","176.198","0","0","118.163.176","154","0","155","0","0","154.132","100","0","118.163","0","0","176.198","100.101.154","0","0","101","163","0","0","0","0","0","155","0","0","0","0","0","0","*100.198.101.102.154","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","138","0","0","0","0","*888","0","0","0","0","0","*888","0","0","0","0","0","0","0","138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","164","154","0","0","154.104","0","0","*104.154","104.135.154","104","0","154","0","0","0","0","0","0","0","0","135","0","0","0","0","0","0","0","0","135","0","0","0","135","0","*164","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","154","135","0","0","0","0","0","*104.135","135","0","0","0","135.104","0","0","0","0","*166.193","0","154","0","0","0","0","0","0","0","0","135.104.154","0","0","0","0","104","0","164","154","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*120.122","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","125","*120","0","125","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","125","0","125","0","0","0","0","122.125.120","0","0","0","0","0","0","0","0","0","0","0","0","125","0","0","120","0","0","*120","0","0","0","0","0","0","0","0","171","100","171","0","171.160.144","0","0","0","100.101","0","0","0","0","*101.100.112","112.145","0","0","112","0","138","0","218.138^1","0","0","132","0","0","356.138^1.218","112","*102.256.112","0","112","0","*102.256.168.112","0","138.122","*138.120","0","138.112.122","0","171.144.103","160.145","0","113","160.145","100.101","0","100.101","103","0","0","145","0","138.112.122.135","138/1","138","144","122","0","138/1.187.188","*144.100.122.138.171","0","115","138","0","160.144.171","112","0","0","*138","160.171","0","0","138.112","0","138","120.122.160","0","113","138","187.107.188","0","0","100","0","0","0","0","0","112.100.101.102","0","0","0","0","0","0","101.102.100","0","0","0","100.101.102","0","*888","0","0","112","0","0","0","0","0","0","0","0","0","0","112","0","0","*112","0","112","0","0","*100","0","112","0","0","0","112","0","0","0","0","101.102","0","0","0","0","0","112","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","112","0","0","0","0","0","0","0","0","0","0","0","150","0","0","150","101.102.100","0","0","150","0","0","0","0","0","0","0","145","*888","0","0","0","0","0","0","0","0","0","0","0","0","150","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","145","0","0","145","0","0","0","0","0","0","145","0","0","0","0","0","0","0","0","0","0","0","0","0","150","0","0","0","*166","0","0","0","0","0","0","*150.166","0","0","0","0","0","0","0","0","*164.166.152","0","0","0","0","0","0","0","0","0","0","0","0","166.152","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*152.166","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","152","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*175","166","0","138/1","0","0","0","0","0","0","0","0","0","0","0","0","0","152","0","138/1","0","0","0","0","0","0","0","0","138/1","0","0","0","0","0","138/1","0","0","0","0","152","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","*138/1","0","*138/1","0","0","138/1","138/1","0","0","0","0","0","0","0","0","0","0","138/1","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*112","0","0","135","135","0","0","0","0","135","0","112","112","0","0","0","0","0","0","0","0","0","0","0","0","135","0","112","0","135","112","0","112","0","0","0","0","112","0","0","0","0","0","0","0","0","0","*135","0","0","0","0","112","135","*135","0","0","0","135","0","0","0","0","0","0","0","0","0","0","0","0","0","*138","0","0","0","0","0","0","0","0","0","0","0","0","0","190","190","0","*190","0","190","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*255","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*190.993.255","0","0","0","0","0","0","0","0","0","0","0","0","0","689","0","0","0","255","0","0","190","0","0","0","0","190","0","0","0","0","0","0","0","0","0","0","190","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","125","0","0","0","0","0","0","0","0","0","0","313","0","0","0","0","0","0","313","0","0","0","0","*313","0","0","308.313","0","0","0","0","0","0","0","0","0","0","0","0","0","0","313","0","0","0","313","0","0","138.125","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","177","0","*888","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","177","0","0","0","0","0","0","0","0","177","0","0","0","0","0","177","0","177","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","177","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","193","0","333.738.138/1","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*514.333.738","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","200.180.333.738","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","218","0","0","0","0","0","0","0","0","143","0","697","177","0","177.17","0","0","0","0","0","17","0","0","0","0","0","0","0","0","0","0","697","177","0","0","17","0","0","*888","*888","0","0","0","177","0","0","0","0","0","177","0","*177.17","0","0","0","0","0","17","0","0","0","0","0","0","0","17","143","0","143","0","0","0","143","0","0","0","0","177","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","143","0","0","0","0","0","0","0","163","139","176","0","0","0","*183.163","0","0","0","0","0","0","0","0","0","0","313","0","0","0","0","*118","0","0","0","0","0","*180.118.163.176.313","0","0","139.176","0","313","0","0","313","0","176","0","0","118","0","183","0","183","0","0","176","0","0","118.183.163.176.313","143","0","0","313","0","139","0","139","118.163","0","0","176","183","0","0","0","163","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*119","0","0","0","0","*119","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*176","0","0","0","0","0","0","176","0","0","176","0","0","0","0","119","0","176","0","0","119/2","0","0","0","0","0","0","176","0","0","176.119/2","0","0","0","0","*888","0","0","0","0","0","0","176","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*158","*158","0","0","0","0","0","0","0","0","0","0","0","0","0","0","158","0","0","0","0","*101.102.100","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*154","154","0","0","154","0","0","135","135.154","154","0","0","0","135","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*154","0","0","135","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","154","135","0","0","0","0","0","135.154","135","0","0","0","*154.135","0","0","0","0","0","0","0","0","0","0","0","0","0","135","0","154","0","0","0","0","0","0","0","154","0","0","154","0","0","132.154","0","0","154","0","154","0","0","0","154","0","0","0","0","0","0","0","0","0","0","738.18","0","0","0","0","*230","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","154","0","0","0","0","0","0","154","0","0","0","0","*154","200.18","0","0","0","0","0","154","0","0","0","0","0","0","0","0","0","0","154","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","198","0","131","0","0","0","0","0","0","131.138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","131","0","0","0","0","0","138.131.125","0","0","0","198","0","0","0","0","0","*141.131.198","0","198","0","0","*138.131","0","*888","0","138.131","0","0","114.2","0","0","0","0","198","0","0","0","0","198","0","0","0","0","0","0","0","113","0","0","0","131","198.141","0","0","0","0","168","112","0","0","160.168","0","0","0","256","0","0","0","*102.256.145.168.160.107","112.256","145","0","0","112","0","0","0","0","0","0","0","0","0","0","112","0","0","112.256","0","*102.256.107","0","0","0","0","112.256","0","0","160.145","0","0","*160.145","0","0","256","0","0","0","0","0","112","0","0","0","0","0","107","0","0","168","0","0","160.168","0","0","0","168","160.168","0","0","0","107","0","0","0","0","168","107","0","0","0","0","0","0","0","0","0","0","0","135","135","0","0","0","0","135","0","0","0","0","0","0","135","0","0","0","0","0","*888","0","0","135","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","135","0","0","0","0","*183","135","*888","0","0","0","135","0","0","0","0","0","0","0","0","0","0","0","0","0","135","0","0","160","0","0","0","0","0","0","0","0","0","0","0","177.175","*100.101","177","0","175","0","0","0","0","0","140","0","0","0","0","175","136","0","0","0","177","0","177","0","0","0","0","0","0","0","0","0","140","0","0","0","0","*177","0","177","140","0","0","0","0","100","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","177.175","0","0","0","0","0","0","0","0","0","0","175","0","0","0","0","177.175","140","*100.101","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","*140","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","140","0","0","*888","0","0","0","0","0","140","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","152","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","*155","0","0","0","168","102.256.112.155","0","0","168..176","168.176","0","0","102.256.155.176","0","0","0","*102.256.168","102.112","0","0","0","112","0","0","0","0","0","0","176","0","0","0","112","*102.256.112.168","176","102.256","0","0","0","0","0","0","112.122","0","155.176","145","0","0","0","102","0","155.102","0","0","176","0","0","176.112","0","0","155","0","0","0","0","0","168","0","0","176.168","102","0","0","168","168","0","0","112","0","0","140.155","155","0","168","0","0","0","102.256","0","166.714","0","0","0","0","0","0","0","714","0","0","0","0","714.166","0","0","0","166","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","714","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","166","0","0","0","0","166","0","0","0","0","0","0","0","0","0","0","0","0","*166","0","0","152","0","*123","174","0","174","0","0","174","0","0","0","0","0","0","122.138","0","0","152","0","122","0","*122.313.308","0","0","0","313","0","0","0","0","122","0","313","0","0","0","0","0","0","0","138.122.313.308","0","0","0","0","0","0","0","0","255","0","0","0","0","0","138.313","0","122.138","0","138.174.313","0","0","138","*255.296.342","0","0","0","174","255","0","0","138","0","0","174","122","0","122.138","138","0","0","138","0","174","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*113.120.115","*101","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","101","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","101","0","0","0","0","0","0","0","0","*101","0","0","0","0","0","0","120","115.113","0","120.113.115","0","0","0","101","0","0","0","0","175","0","177","0","175","0","0","0","0","0","0","0","0","0","*888","175","0","0","0","0","177","0","0","0","0","0","0","0","0","0","0","*175","0","0","0","0","0","0","0","177","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*177","0","177","0","0","0","0","0","0","0","0","0","0","175","0","0","0","0","175.177","0","0","0","0","0","0","0","112","0","*119.190","0","131","0","0","0","138","131","0","112","112","0","0","0","131.112","0","0","0","0","0","119","119","0","0","0","131.112","0","119","112","131","122.112","0","119","0","0","0","0","0","0","0","119","0","190","0","0","131","*888","0","0","0","138.119.112.131","0","112","0","*138.119","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","*119","0","0","0","131","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*993","0","0","0","*17.255","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","993.17","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","993","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","164","0","0","171","155","171","0","*103.176.144.164","103.171","0","0","155.176","0","164","0","103.171","0","0","0","136","0","993","0","0","0","0","0","178","0","0","0","0","0","176","0","164","176.155","0","0","0","0","0","0","0","0","0","0","155","0","0","0","103","0","176","0","0","176","0","0","*155","0","0","0","103.171","0","0","155","*103","176.171.144","0","0","0","0","0","*103.171","0","0","0","0","164.155","0","0","0","0","0","0","0","0","0","0","0","0","155","0","0","0","0","0","0","155","0","0","0","145","0","145","0","0","0","0","0","0","0","0","0","0","0","0","0","0","145","0","0","0","155","0","0","0","0","0","0","0","0","0","0","*145.155","0","0","155","0","0","0","0","0","0","0","0","155","0","0","0","0","0","0","155","0","0","0","0","0","0","0","0","0","0","0","0","155","0","0","0","0","0","0","0","0","0","0","0","0","*112","0","0","0","0","0","0","0","0","0","0","112","112","0","0","0","112.198","0","0","0","0","0","0","0","0","0","0","112.198","112","0","112","0","112","0","0","0","*888","112","0","0","0","0","0","0","0","0","0","198","0","198","0","0","112","0","*888","0","0","0","0","0","0","0","0","0","198","0","0","0","0","198","0","0","*112","0","0","0","0","0","0","0","0","0","198","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","119","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","*119","0","0","0","0","0","187","0","0","*118.156","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*119","0","187","0","0","0","0","0","0","0","0","0","0","0","160","0","0","0","0","0","0","0","160","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*160","0","0","0","160","0","0","0","0","0","0","0","160","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","160","0","0","0","0","160","0","0","0","0","0","160","0","0","0","0","0","0","0","0","0","0","0","0","100.101.102","0","152","0","0","0","0","183.101.100.102","0","0","0","100.101.102","100.101","0","0","0","0","0","0","0","0","0","183","0","*100.101.255.102.158","0","0","0","0","183","100.101.102","0","102","0","255","0","0","192","0","0","0","0","0","0","0","*158","100.101.255.102","0","0","0","0","0","183","0","0","0","0","0","0","100.101","158.255","0","0","0","0","100.101.255.102","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","100.101.102","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*255.158","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*255.158","0","0","0","0","255","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","154","0","0","0","0","0","0","0","0","0","*198","0","0","0","0","0","0","0","0","198","0","0","0","0","0","0","0","0","0","0","198","0","0","0","0","0","0","0","0","0","0","0","0","0","198","0","0","0","0","0","198","0","198","0","0","0","0","0","0","0","0","0","0","0","0","0","0","198","*100.101.255","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","198","0","0","0","0","0","0","0","0","135.103","*103.178.135","0","0","198","0","135.178","0","103","0","0","0","0","198.135","0","0","0","0","0","0","0","0","135","0","*141.198","0","135","0","0","0","0","0","0","0","0","0","103","178","198","0","0","0","0","0","0","0","*173","0","0","173","135.178","135.141","0","0","0","135","103","0","0","0","0","198","0","0","0","0","198","103","0","135","173","0","0","0","0","0","0","0","131","141","0","0","0","0","0","0","0","0","0","0","0","0","0","*138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","*138","0","0","0","0","*117","0","0","0","0","0","0","0","0","0","138","0","0","0","138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*117","0","0","0","0","0","0","0","0","0","0","0","176","0","0","0","0","0","176","0","0","0","0","0","0","0","0","0","0","0","0","0","0","176","0","0","0","0","0","0","176","0","0","176","0","0","0","0","0","0","176","0","0","0","0","0","0","0","*173.198","0","0","0","0","*173.176","0","0","176","0","0","0","0","0","0","0","0","*176.198","0","0","0","0","0","0","0","0","173","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","145","0","*145","0","0","0","0","0","0","0","0","0","0","0","0","0","0","145","0","0","0","0","0","0","0","0","0","0","0","145","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*145","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","*104.154.135","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","992","168","154","163","0","168.131","131.176","0","0","163.118.183","*138","131.125","0","115","0","0","0","0","125.131","689","125","0","0","0","313.163.118.183","0","0","0","0","*138.125.115.131","168","*176.118.163.313.183.135","0","131","176.168","0","138.125","138","0","138.125.313","0","176","0","0","*118.119","0","183","0","183","173.131","0","*173.176","0","0","0","0","138.125","176","138.125","313.117","0","138.125.115","0","*168.163.118.115","138","0","168.176","117","0","0","168.138","168.163.690","0","689","138.125.115","173","138.125.154","138.125","115","119.689","138.125.115","0","0","131","0","143","143","0","0","0","154.104","0","0","104.135","104.154.135","154.104","0","0","0","*104.154","0","0","0","0","0","*136","135","0","0","0","0","0","0","0","0","135","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","135","0","0","0","*104.154.135","0","0","0","0","0","0","104.154.135","143","0","0","0","0","0","0","0","0","0","0","0","0","135","0","104","0","154","0","0","104","0","*143","0","0","0","154","0","0","0","0","120","135","135","0","0","154","0","135","0","0","0","0","0","0","*120.135","0","0","0","0","0","0","0","0","135","0","*120.138.141","0","*135","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","154","135.141","0","0","0","0","0","0","0","0","0","120","135","120","0","0","0","0","0","0","0","0","0","0","0","0","120.135","0","120","120","0","0","120","0","0","0","*141","*155.176","0","0","0","0","0","0","0","144","0","0","0","0","0","0","0","144","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","176","0","0","0","0","0","0","*144.176","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","144","0","0","0","0","144","0","0","0","0","0","*144","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","123","174","0","0","174","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*255","0","0","0","255","0","0","0","0","0","0","0","0","0","0","0","0","*138.131.174","0","0","*888","255","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","0","0","0","0","0","255","0","0","0","174","0","0","0","0","0","0","*174","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*120","0","0","0","0","0","0","0","0","120","0","0","0","0","120","0","0","0","0","0","0","0","0","0","0","0","0","*120","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","120","0","0","0","0","120","120","0","0","0","0","0","0","0","0","0","0","0","120","0","120","120","0","0","120","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","154","0","0","0","0","0","136","0","0","0","0","0","0","0","0","0","*154","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","6.934349","79.855124","0","0","0","101.102","171","0","171.103","103","0","0","0","0","152","0","*138.100.101.120.122.125.103","0","0","152","0","0","0","0","0","0","0","0","0","0","224.230.226","230","0","0","0","0","152","0","0","0","0","0","0","0","171.103","0","0","0","0","101.102","0","101.102","103","0","0","0","0","0","143","0","0","0","0","0","0","120","0","0","103","171","0","0","0","0","0","*103","0","0","0","0","0","0","0","0","240.260.188","0","0","0","0","0","0","0","0","0","0","*139.120","0","0","0","0","0","0","0","120","0","0","0","0","0","0","0","149","0","0","0","139","0","158.255","0","0","0","0","139.162.120","0","0","0","0","255","120","0","341","0","0","0","0","0","0","158","*158.255","255","0","0","0","0","0","0","0","120","0","0","120","0","162","0","0","0","0","0","255","0","0","0","0","0","0","120","0","120","120","0","0","120","0","0","0","0","0","0","0","0","168","0","*163","0","168","0","114","0","163","0","0","114","168","0","0","0","0","0","0","0","0","0","0","163","0","0","0","0","114","168","163","0","0","168","0","0","0","0","0","0","0","0","0","*118.156","0","0","0","0","0","0","0","0","0","*114.118.156.163","0","0","0","0","0","0","0","0","0","0","0","168","0","0","0","168","*168","0","0","114","0","0","114","114","0","114.168","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","136","138","0","0","0","0","0","0","0","0","0","0","138","0","0","*888","0","0","0","0","0","0","138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","0","138","0","0","120.138","0","0","0","0","0","0","0","*888","*138","0","0","0","0","0","*138","*120.138","*138","0","0","0","0","0","0","0","166","0","0","171","0","171","0","*103.144.171","103","0","0","0","0","*193","0","171.103","0","166","0","*136","0","0","0","0","193","0","0","0","0","0","0","0","0","0","0","166","0","0","0","0","0","0","0","*103.144.171","0","0","0","0","0","0","0","103","0","0","0","0","0","193","0","0","0","0","193","103.144","0","0","0","0","144.171","0","0","0","166","0","103.144.171","0","0","0","0","166.193","0","0","0","0","0","166","0","0","150","0","170","150.177.186.174","179","190.177.186.174","0","*160.179.190.144.150.153.186.174","*179.190","179","0","176","0","0","0","160.144","0","150","*175","0","0","0","0","177","0","177","0","176","0","0","0","0","160","176","177","0","176","0","174","0","177","0","190.177","144.171.176","0","0","0","160","0","0","0","0","0","*176","0","0","176","0","0","144.176","174","0","0","171.144","0","153","0","0","0","0","0","0","0","*160.154.179.171.190.153","0","174","0","0","0","160","179","0","0","0","*150.177","0","0","0","0","*154.102","0","0","100.101.102.256.154","0","0","154","154","179.154","0","183.100.101.154","0","154","0","100.101.102.256","100.101.102.256","0","0","0","0","0","0","0","0","0","183","0","*100.101.255.102","0","154","0","0","0","100.101.102.256","0","102.256","0","0","0","0","0","0","0","0","0","0","0","100.101.255.102","255","*100.101.255.102","0","0","0","0","0","183.117","154","0","0","0","117","0","0","255","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","100.101.102.256.154","0","0","0","0","0","0","0","*120.139","0","0","0","0","0","*888","0","120","120","0","0","0","0","120","0","0","0","0","0","139","0","0","0","0","0","0","120.139","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","120","0","0","*139","0","120","120.139","0","0","0","0","0","0","0","0","0","0","0","120","0","120","120","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","0","0","*138","*888","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*138.102","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*138","0","0","0","0","0","0","0","190","168.186","179","*186.163.171.190","168","186.179","190.179","179","0","163.198","0","0","0","144.16","0","0","0","0","198","0","0","0","0","0","163","0","0","0","0","198","160.168","163","0","0","168","0","0","0","0","0","190","171","160","198","0","160","0","0","0","198","0","198","0","0","163","0","0","0","0","0","0","171","0","*168.163","0","0","*154.168.186.171.179.198.190.160","0","0","0","168","0","171","*888","0","0","0","160","179","0","168.138","0","0","0","198","*888","0","0","0","171","0","171","0","171","0","0","0","0","0","0","0","171","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","*171","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*171","0","0","0","0","171","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","171","0","0","0","0","0","0","174","0","174","0","174","0","0","0","0","0","0","0","0","0","0","0","0","0","*689","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","174","0","0","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","689","0","0","0","174","0","0","0","0","0","0","0","174","0","0","0","0","0","0","0","0","0","0","0","0","*689","0","0","0","0","0","0","0","0","0","0","112","0","0","135","135","*888","0","198","0","135","0","138","0","0","0","0","*138.198","0","0","0","0","0","0","0","0","135","0","138","112","0","112","0","112","0","138","138","0","138","0","0","0","*112","0","0","0","0","0","*135.198","0","198","0","0","138","135","0","0","138","0","135","0","0","174","0","0","198","0","0","0","0","198","0","0","0","0","*888","113","113","0","0","0","0","0","198","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","107","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","107","0","0","0","107","0","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","0","0","0","0","0","*888","0","0","0","0","*260.274.275.261.107","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","274.275.260.261.107","0","0","0","0","0","154","0","0","*104.154","0","120","104","104","*104.154","*154","0","0","154.104","120","120.138","0","0","0","0","120","0","0","0","0","0","0","0","0","154","154","0","0","120","0","0","0","0","138","0","0","138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","104.154","120","0","0","120","104","138","120","0","138","0","0","0","0","*138","0","0","0","0","*120","0","0","120","0","0","120","104","0","0","154","0","164","0","0","0","0","0","0","*160.165","0","0","0","0","0","0","120","120.160.138","0","*888","0","136","0","0","0","*888","0","0","0","0","0","0","0","0","160","162","0","164","0","0","138","138","0","138","0","*888","160","0","0","160","0","0","0","0","0","0","0","0","138","0","0","0","0","0","0","120","162","0","*138","*888","160","0","0","0","0","0","0","0","138","0","138","0","*888","0","*120","0","0","164","0","0","0","0","0","0","179","0","0","0","*179","*179","*138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","179","0","0","0","166","179","0","0","0","0","*138","138","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","689","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*119","0","0","0","0","119","0","0","0","0","0","0","0","0","0","*119.689","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","168","0","0","0","168","0","0","0","0","0","0","*125","168.125","0","0","0","0","0","0","125","0","0","0","0","0","0","0","0","125","168","0","0","0","168","0","125","0","0","138.125","0","0","0","0","113","0","0","0","0","0","0","0","0","0","689.125.138","0","125.138","0","138","0","0","125.168","0","0","138","0","168","0","0","0","*168.138","168","0","689","125","0","125","*125.113","113","113","0","0","0","0","0","0","0","0","0","0","104","0","0","104","104","104","0","0","0","104","0","187.107","0","0","0","136","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","107","0","107","0","0","*187.240","240.188","0","0","0","0","0","0","0","0","0","0","0","0","0","240","104","0","0","0","0","0","0","0","0","0","150","0","0","150.174.171","0","171","0","171.174","150","0","0","0","0","166","0","0","0","150","0","0","0","0","0","0","0","0","0","0","0","150","0","0","0","0","0","*888","0","0","0","0","0","0","0","171","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","*150.174.171","0","0","0","0","0","171","174","0","0","0","150","0","0","0","0","0","0","0","0","166.164","0","0","0","0","0","0","164","0","0","0","0","0","166.131.164","0","0","0","166","0","0","0","0","0","0","0","0","0","0","0","0","0","131","0","0","140","*131.166.164","0","*166","0","0","0","131","0","140","166","0","0","0","0","0","0","131","0","0","0","0","131","*888","0","0","0","0","0","0","0","0","0","0","0","0","0","0","166","0","0","0","0","0","0","140.164.166","0","0","0","0","0","0","0","0","0","154","0","0","*100.101.102.256","0","0","154","154","154","0","*198.*100.101.102.256.154","0","0","0","100.101.102.256","100.102.256","0","0","136","*198","0","0","0","0","0","0","0","0","154","154","141.198","102.256.141","0","100.101.102.256","0","102.256","0","0","0","0","0","0","0","0","*198","0","0","100","0","100.101.102.256.154","141.198","0","198","0","0","0","154","*141","0","0","0","154","100.101","0","0","0","0","198","100.101.102.256","0","0","101","198","0","0","0","0","154","0","0","0","0","0","0","0","0"];
+
+NUMBER_EDGES=edges.length;
+
+var from=0;
+var to=0;
+var ne=0;
+ 
+for (var i = 0; i < NUMBER_EDGES; i++) { 
+	var k=(from * NUMBER_NODES) + to;	
+	if (from !=  to) { 
+		if (edges[k] !="0"){
+		   var routes=edges[k];
+		 // if (from==7 && to==11) {debugger;}
+		 // if (from==11 && to==7) {debugger;}
+		 
+		 //x=k + " " + nodes[from].name + " > " + nodes[to].name  + " " + routes;
+		 //debugdata.push(x);
+		   
+		   
+		   if (edges[k].indexOf("*") >=0) {
+		             
+		            if (nodes[from].cons.indexOf(to) ==-1) {
+						nodes[from].cons.push(to);
+					}
+					if (nodes[to].cons.indexOf(from) ==-1) {
+						nodes[to].cons.push(from);
+					}
+					
+			}
+			
+			if (routes.indexOf("*888") ==-1){
+				addbusess(nodes[from].bus,routes);
+				addbusess(nodes[to].bus,routes);
+			}
+			
+		}
+	 }
+		nodes[from].cons.sort();
+		nodes[to].cons.sort();
+		to++; // 
+		if (to == NUMBER_NODES) {
+			to=0;
+			from++;
+		} 
+		
+		
+  }
+}
+
+function addbusess(xnode,route) {
+     
+  
+	var arx=route.split(".");
+    
+	for (var i = 0; i < arx.length; i++) {
+		if (arx[i].indexOf("*") >=0 ){
+			arx[i]=arx[i].substring(1); // remove * no needed
+		}
+		if (xnode.indexOf( arx[i])==-1){
+			xnode.push(arx[i]);
+		}
+	}
+    xnode.sort();
+	return true;
+}
+
+function randomNode(){
+var x=Math.floor((Math.random() * 80) + 1);
+return x;
+}
+
+
+		
+</script>
+
+
+</body>
+</html>
